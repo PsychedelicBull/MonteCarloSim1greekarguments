@@ -1,0 +1,61 @@
+import numpy as np
+import yfinance as yf
+
+
+# noinspection PyTypeChecker
+def monte_carlo_american_option_greeks(s0, k, R, t, SIGMA, n_trials, n_steps, type='call'):
+    dt: object = t / n_steps
+    s = np.zeros((n_steps + 1, n_trials))
+    s[0] = s0
+    for i in range(1, n_steps + 1):
+        z = np.random.normal(size=n_trials)
+        # noinspection PyTypeChecker
+        s[i] = s[i - 1] * np.exp((R - 0.5 * SIGMA ** 2) * dt + SIGMA * np.sqrt(dt) * z)
+    if type == 'call':
+        payoff = np.maximum(s[-1] - k, 0)
+    else:
+        payoff = np.maximum(k - s[-1], 0)
+    discounted_payoff = payoff * np.exp(-R * t)
+    option_price = discounted_payoff.mean()
+
+    # Greek inputs calculation
+    ds = s[-1] - s0
+    ds_mean = ds.mean()
+    ds_std = ds.std()
+    ds_mean_normalized = ds_mean / s0
+    dt = t / n_steps
+    delta = ds_mean_normalized / SIGMA * np.sqrt(dt)
+    gamma = (ds_mean_normalized / (SIGMA * np.sqrt(dt)) - 1 / 2) * (s0 / ds_std)
+    # noinspection PyTypeChecker
+    theta = -s0 * ds_mean_normalized * 1 / dt
+    vega = s0 * ds_std * np.sqrt(dt)
+    Rho = -t * payoff.mean()
+
+    return option_price, delta, gamma, theta, vega, Rho
+
+
+ticker = "AAPL"
+data = yf.download(ticker, start="2022-01-01", end="2022-01-31")
+
+# Get the close price and calculate the volatility
+S0 = data["Close"][-1]
+sigma = data["Close"].pct_change().std() * np.sqrt(252)
+
+# Define the option parameters
+K = 100
+r = 0.05
+T = 1
+n_trials = 10000
+n_steps = 252
+
+call_price, call_Delta, call_Gamma, call_Theta, call_Vega, call_Rho = monte_carlo_american_option_greeks(S0, K, r, T,
+                                                                                                         sigma,
+                                                                                                         n_trials,
+                                                                                                         n_steps,
+                                                                                                         type='call')
+put_price: object
+put_price, put_delta, put_gamma, put_theta, put_vega, put_rho = monte_carlo_american_option_greeks (S0, K, r, T,
+                                                                                                    sigma, n_trials,
+                                                                                                    n_steps,
+                                                                                                    type='put')
+print(put_price)
